@@ -1,0 +1,106 @@
+version: '3.8'
+
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: happy-order-app
+    restart: unless-stopped
+    working_dir: /var/www
+    volumes:
+      - ./:/var/www
+      - ./docker/php/local.ini:/usr/local/etc/php/conf.d/local.ini
+    networks:
+      - happy-order-network
+    depends_on:
+      - mysql
+      - redis
+
+  nginx:
+    image: nginx:alpine
+    container_name: happy-order-nginx
+    restart: unless-stopped
+    ports:
+      - "8000:80"
+      - "8443:443"
+    volumes:
+      - ./:/var/www
+      - ./docker/nginx/nginx.conf:/etc/nginx/nginx.conf
+      - ./docker/nginx/sites/:/etc/nginx/sites-available
+      - ./docker/nginx/ssl/:/etc/ssl/certs
+    networks:
+      - happy-order-network
+    depends_on:
+      - app
+
+  mysql:
+    image: mysql:8.0
+    container_name: happy-order-mysql
+    restart: unless-stopped
+    environment:
+      MYSQL_DATABASE: happy_order
+      MYSQL_ROOT_PASSWORD: root_password
+      MYSQL_USER: happy_order
+      MYSQL_PASSWORD: password
+    volumes:
+      - mysql_data:/var/lib/mysql
+      - ./docker/mysql/my.cnf:/etc/mysql/my.cnf
+    ports:
+      - "3306:3306"
+    networks:
+      - happy-order-network
+
+  redis:
+    image: redis:7-alpine
+    container_name: happy-order-redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    networks:
+      - happy-order-network
+
+  minio:
+    image: minio/minio
+    container_name: happy-order-minio
+    restart: unless-stopped
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    environment:
+      MINIO_ROOT_USER: minioadmin
+      MINIO_ROOT_PASSWORD: minioadmin
+    volumes:
+      - minio_data:/data
+    command: server /data --console-address ":9001"
+    networks:
+      - happy-order-network
+
+ # websockets:
+#   build:
+#     context: .
+#     dockerfile: Dockerfile
+#   container_name: happy-order-websockets
+#   restart: unless-stopped
+#   working_dir: /var/www
+#   volumes:
+#     - ./:/var/www
+#   ports:
+#     - "6001:6001"
+#   command: php artisan websockets:serve
+#   networks:
+#     - happy-order-network
+#   depends_on:
+#     - redis
+
+
+volumes:
+  mysql_data:
+  redis_data:
+  minio_data:
+
+networks:
+  happy-order-network:
+    driver: bridge
